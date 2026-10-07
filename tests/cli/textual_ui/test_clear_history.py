@@ -257,3 +257,28 @@ async def test_clear_history_resets_terminal_title(vibe_app: VibeApp) -> None:
         await vibe_app._clear_history()
 
         vibe_app._terminal_notifier.set_default_title.assert_called_once_with("")
+
+
+@pytest.mark.asyncio
+async def test_clear_history_refocuses_input(vibe_app: VibeApp) -> None:
+    """The teardown/rebuild during /clear can steal focus from the input.
+
+    The handler must re-focus the input after the refresh cycle so typed
+    characters are visible — matching _switch_to_input_app's deferred
+    call_after_refresh(focus_input) pattern.
+    """
+    async with vibe_app.run_test():
+        _set_session_log(vibe_app, enabled=True, persisted=True)
+        vibe_app.app_server.clear_history = AsyncMock()
+        vibe_app._reset_message_widgets = AsyncMock()
+        vibe_app._mount_and_scroll = AsyncMock()
+        vibe_app._handle_user_message = AsyncMock()
+        vibe_app.call_after_refresh = MagicMock()
+
+        await vibe_app._clear_history()
+
+        callbacks = [c.args[0] for c in vibe_app.call_after_refresh.call_args_list]
+        assert vibe_app._chat_input_container is not None
+        assert any(
+            cb == vibe_app._chat_input_container.focus_input for cb in callbacks
+        ), "Expected call_after_refresh(focus_input) after /clear"

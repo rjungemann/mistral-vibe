@@ -4891,6 +4891,12 @@ class VibeApp(App):  # noqa: PLR0904
                 )
             self._chat_widget.scroll_home(animate=False)
             self._sync_terminal_title()
+            # The teardown/rebuild above (remove_children, mount, scroll) can
+            # steal focus from the input. Re-focus after the refresh cycle so
+            # typed characters are visible — matching _switch_to_input_app's
+            # call_after_refresh(focus_input) pattern.
+            if self._chat_input_container:
+                self.call_after_refresh(self._chat_input_container.focus_input)
 
         except Exception as e:
             await self._mount_and_scroll(
